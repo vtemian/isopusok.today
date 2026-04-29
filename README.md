@@ -16,15 +16,23 @@ for the full design rationale.
 
 ## Running locally
 
+One command does everything (installs deps, creates `.dev.vars`, applies the
+local D1 migrations, starts the dev server):
+
+```sh
+make dev
+```
+
+Or via npm:
+
 ```sh
 npm install
-cp .dev.vars.example .dev.vars
-# edit .dev.vars and set SALT to anything for local dev
-npm run migrate:local
-npm run dev
+npm start
 ```
 
 Then open http://127.0.0.1:8787
+
+`make help` lists all targets.
 
 ## Tests
 

@@ -1,1 +1,4 @@
-SALT="generate-with: openssl rand -hex 32"
+# Local dev secrets. Copied to .dev.vars by `make dev` on first run.
+# This default value is fine for local dev — generate a real one for production with:
+#   openssl rand -hex 32 | npx wrangler secret put SALT
+SALT="local-dev-salt-do-not-use-in-prod"
