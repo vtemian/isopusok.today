@@ -4,6 +4,9 @@
   Live community vote on whether Anthropic's Opus model is having a good day.
 </p>
 
+<img width="1000" height="605" alt="Screenshot 2026-04-29 at 5 53 22 PM" src="https://github.com/user-attachments/assets/8ff392c2-fe44-4954-8281-175075fb604b" />
+
+
 <p align="center">
   <a href="https://isopusok.today">Website</a> &middot;
   <a href="#getting-started">Getting started</a> &middot;
