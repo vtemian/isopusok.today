@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 interface Stats {
   rolling24h: { yes: number; no: number };
+  hours: { hour: string; yes: number; no: number }[];
 }
 
 async function getStats(): Promise<{ status: number; body: Stats }> {
@@ -28,10 +29,10 @@ describe("GET /api/stats", () => {
 
   afterEach(() => vi.useRealTimers());
 
-  it("empty DB returns zero rolling", async () => {
+  it("empty DB returns zero rolling and empty hours", async () => {
     const { status, body } = await getStats();
     expect(status).toBe(200);
-    expect(body).toEqual({ rolling24h: { yes: 0, no: 0 } });
+    expect(body).toEqual({ rolling24h: { yes: 0, no: 0 }, hours: [] });
   });
 
   it("counts only votes inside the rolling 24h window", async () => {
@@ -49,7 +50,40 @@ describe("GET /api/stats", () => {
     expect(body.rolling24h).toEqual({ yes: 1, no: 1 });
   });
 
-  it("POST /api/vote response includes the rolling tally", async () => {
+  it("buckets the last 8 UTC hours, most recent first", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-29T12:00:00Z"));
+
+    await seed([
+      { ts: tsAt("2026-04-29T11:30:00Z"), verdict: 1 },
+      { ts: tsAt("2026-04-29T11:45:00Z"), verdict: 1 },
+      { ts: tsAt("2026-04-29T11:50:00Z"), verdict: 0 },
+      { ts: tsAt("2026-04-29T05:15:00Z"), verdict: 1 }, // ~7h ago, included
+      { ts: tsAt("2026-04-29T03:15:00Z"), verdict: 1 }, // ~9h ago, excluded
+    ]);
+
+    const { body } = await getStats();
+    expect(body.hours[0]).toEqual({ hour: "2026-04-29T11:00:00Z", yes: 2, no: 1 });
+    expect(body.hours[1]).toEqual({ hour: "2026-04-29T05:00:00Z", yes: 1, no: 0 });
+    expect(body.hours.find((h) => h.hour === "2026-04-29T03:00:00Z")).toBeUndefined();
+  });
+
+  it("excludes hourly votes older than 8 hours", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-29T12:00:00Z"));
+
+    await seed([
+      { ts: tsAt("2026-04-29T03:30:00Z"), verdict: 1 }, // 8.5h ago
+      { ts: tsAt("2026-04-29T05:30:00Z"), verdict: 1 }, // 6.5h ago
+    ]);
+
+    const { body } = await getStats();
+    const keys = body.hours.map((h) => h.hour);
+    expect(keys).not.toContain("2026-04-29T03:00:00Z");
+    expect(keys).toContain("2026-04-29T05:00:00Z");
+  });
+
+  it("POST /api/vote response includes rolling and hours", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-04-29T12:30:00Z"));
 
@@ -60,8 +94,6 @@ describe("GET /api/stats", () => {
     });
     const body = (await res.json()) as Stats;
     expect(body.rolling24h).toEqual({ yes: 1, no: 0 });
-    expect(body).not.toHaveProperty("cells");
-    expect(body).not.toHaveProperty("days");
-    expect(body).not.toHaveProperty("hours");
+    expect(body.hours[0]).toEqual({ hour: "2026-04-29T12:00:00Z", yes: 1, no: 0 });
   });
 });

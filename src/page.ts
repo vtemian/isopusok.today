@@ -94,9 +94,33 @@ export const PAGE_HTML = `<!doctype html>
     text-align: center;
     color: var(--muted);
     font-size: 0.875rem;
-    margin: 0 0 40px;
+    margin: 0 0 24px;
   }
   .meta .yes-count { color: var(--coral); }
+
+  .hours {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 4px;
+    max-width: 320px;
+    margin: 0 auto 16px;
+  }
+  .hour-cell {
+    aspect-ratio: 1 / 1;
+    background: var(--coral); /* default = ok */
+    border: 1px solid rgba(0, 0, 0, 0.15);
+  }
+  .hour-cell[data-pct="0"]   { background: #3a2a26; }
+  .hour-cell[data-pct="25"]  { background: #5a3a30; }
+  .hour-cell[data-pct="50"]  { background: #885548; }
+  .hour-cell[data-pct="75"]  { background: #aa6952; }
+  .hour-cell[data-pct="100"] { background: var(--coral); }
+  .hours-caption {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.75rem;
+    margin: 0 0 32px;
+  }
 
   footer {
     margin-top: 48px;
@@ -125,6 +149,9 @@ export const PAGE_HTML = `<!doctype html>
 
   <p class="bar" id="bar" aria-live="polite"></p>
   <p class="meta" id="meta"></p>
+
+  <div class="hours" id="hours" role="img" aria-label="last 8 utc hours, oldest left"></div>
+  <p class="hours-caption">last 8 hours utc · empty = ok</p>
 
   <footer>
     <span id="status">loading…</span>
@@ -316,8 +343,41 @@ function moodFor(stats, currentVote) {
   if (yes + no === 0) return "yes";
   return yes >= no ? "yes" : "no";
 }
+function bucketPct(pct) {
+  return pct >= 90 ? 100 : pct >= 65 ? 75 : pct >= 35 ? 50 : pct >= 10 ? 25 : 0;
+}
+function pad2(n) { return String(n).padStart(2, "0"); }
+
+// Last 8 UTC hours, oldest on the left, current hour on the right.
+// An hour with no votes renders as "ok" (full coral) per project rule.
+function renderHours(hours) {
+  const grid = document.getElementById("hours");
+  grid.replaceChildren();
+  const byKey = new Map(hours.map((h) => [h.hour, h]));
+  const now = new Date();
+  for (let i = 7; i >= 0; i--) {
+    const d = new Date(Date.UTC(
+      now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours() - i
+    ));
+    const key = d.toISOString().slice(0, 13) + ":00:00Z";
+    const entry = byKey.get(key);
+    const cell = el("div", { class: "hour-cell" });
+    const label = key.slice(0, 10) + " " + pad2(d.getUTCHours()) + ":00 utc";
+    if (entry) {
+      const total = entry.yes + entry.no;
+      const pct = total === 0 ? 0 : Math.round((entry.yes / total) * 100);
+      cell.dataset.pct = String(bucketPct(pct));
+      cell.title = label + " — " + pct + "% yes (" + total + " votes)";
+    } else {
+      cell.title = label + " — no complaints (opus presumed ok)";
+    }
+    grid.appendChild(cell);
+  }
+}
+
 function applyStats(stats, currentVote) {
   renderBar(stats.rolling24h.yes, stats.rolling24h.no);
+  renderHours(stats.hours || []);
   drawMascot(moodFor(stats, currentVote));
 }
 
