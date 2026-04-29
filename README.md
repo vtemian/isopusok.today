@@ -1,128 +1,80 @@
-# isopusok.today
+<h1 align="center">isopusok.today</h1>
 
-A petty community telemetry site for the question *"Is Opus OK today?"*
+<p align="center">
+  Live community vote on whether Anthropic's Opus model is having a good day.
+</p>
 
-Two buttons. One vote per identity per rolling 24 hours. 30-day mood heatmap.
-Pixel mascot whose face mirrors the verdict.
+<p align="center">
+  <a href="https://isopusok.today">Website</a> &middot;
+  <a href="#getting-started">Getting started</a> &middot;
+  <a href="CONTRIBUTING.md">Contributing</a>
+</p>
 
-## Stack
+---
 
-- Cloudflare Workers + D1 (single Worker serves both the HTML and the JSON API)
-- Vanilla TypeScript on the server, vanilla HTML/JS on the client
-- Vitest with `@cloudflare/vitest-pool-workers` running against an in-memory D1
+Two buttons. One verdict per identity per rolling 24 hours. An 8-hour mood
+heatmap. A pixel mascot whose face mirrors the verdict.
 
-See [`docs/plans/2026-04-29-isopusok-today-design.md`](docs/plans/2026-04-29-isopusok-today-design.md)
-for the full design rationale.
+## Tech stack
 
-## Running locally
+| | |
+|---|---|
+| **Runtime** | Cloudflare Workers |
+| **Database** | Cloudflare D1 (SQLite at the edge) |
+| **Server** | Vanilla TypeScript |
+| **Client** | Vanilla HTML/JS, no bundler |
+| **Tests** | Vitest + `@cloudflare/vitest-pool-workers` against in-memory D1 |
 
-One command does everything (installs deps, creates `.dev.vars`, applies the
-local D1 migrations, starts the dev server):
+The Worker serves both the HTML page and the JSON API.
+
+## Getting started
 
 ```sh
 make dev
 ```
 
-Or via npm:
+That installs deps, creates `.dev.vars`, applies local D1 migrations, and
+starts the worker on <http://127.0.0.1:8787>. `make help` lists every target.
 
 ```sh
-npm install
-npm start
-```
-
-Then open http://127.0.0.1:8787
-
-`make help` lists all targets.
-
-## Tests
-
-```sh
-npm test           # one shot
-npm run test:watch # watch mode
+npm test         # one shot
 npm run typecheck
 ```
 
-The test harness applies `migrations/0001_init.sql` to an in-memory D1 before
-each test file via `applyD1Migrations`. No mocks anywhere — tests hit a real
-(local) D1.
-
-## Deploy
-
-### One-time setup
-
-1. Log into Cloudflare via wrangler:
-   ```sh
-   npx wrangler login
-   ```
-
-2. Create the production D1 database (already done — see commit `8086f38`):
-   ```sh
-   npx wrangler d1 create isopusok
-   ```
-   Paste the returned `database_id` into `wrangler.toml`.
-
-3. Set the production salt:
-   ```sh
-   openssl rand -hex 32 | npx wrangler secret put SALT
-   ```
-
-4. First deploy:
-   ```sh
-   npx wrangler d1 migrations apply isopusok --remote
-   npx wrangler deploy
-   ```
-
-5. Bind `isopusok.today` to the Worker in the Cloudflare dashboard
-   (Workers & Pages → your worker → Settings → Triggers → Custom Domains).
-
-6. Add the rate-limit rule (see below).
-
-### Rate limit rule
-
-In the Cloudflare dashboard for the `isopusok.today` zone:
-
-- **Security → WAF → Rate limiting rules → Create rule**
-- Field: `URI Path` · Operator: `equals` · Value: `/api/vote`
-- And: HTTP method `equals` `POST`
-- Counting characteristic: IP source address
-- Requests: **10** in **1 minute**
-- Action: **Block** for **10 seconds**
-
-Free plan allows one rate-limit rule per zone, which is exactly what we need.
-
-### CI deploys
-
-The workflow in `.github/workflows/deploy.yml` runs tests and deploys on every
-push to `main`. It needs two repository secrets:
-
-- `CLOUDFLARE_API_TOKEN` — token with `Workers Scripts:Edit` and
-  `D1:Edit` permissions on the account
-- `CLOUDFLARE_ACCOUNT_ID` — your account ID (visible in the dashboard sidebar)
-
-## Costs
-
-Free tier covers everything realistic:
-
-| Resource          | Free tier      | Expected use                     |
-| ----------------- | -------------- | -------------------------------- |
-| Workers requests  | 100k/day       | Hundreds/day; spike ≤ 50k/day    |
-| D1 storage        | 5 GB           | ~50M votes before hitting cap    |
-| D1 row writes     | 100k/day       | One per vote                     |
-| Custom domain     | Free           | Already on Cloudflare DNS        |
-
-If we ever blow it: Workers Paid is $5/mo flat. Domain renewal is the only
-guaranteed recurring cost (~$30–40/yr for `.today`).
-
-## Privacy
-
-The Worker never stores raw IP or raw fingerprint. It computes
-`HMAC_SHA256(SECRET_SALT, ip + ":" + fingerprint)` and stores only the hex
-digest. The salt is a Worker secret, not in the repo. A leaked DB doesn't
-expose voter IPs unless the salt also leaks.
+Tests hit a real (local) D1 — no mocks anywhere.
 
 ## Endpoints
 
-- `GET /` — the page
-- `GET /api/stats` — `{ rolling24h: { yes, no }, days: [{ date, yes, no }, ...] }`
-- `POST /api/vote` — body `{ verdict: "yes" | "no", fingerprint: string }`,
-  returns the same shape as `/api/stats`
+| Endpoint | Description |
+|---|---|
+| `GET /` | The page |
+| `GET /api/stats` | `{ rolling24h: { yes, no }, hours: [...] }` |
+| `POST /api/vote` | Body `{ verdict: "yes" \| "no", fingerprint: string }` — returns the same shape as `/api/stats` |
+
+## Privacy
+
+The Worker never stores raw IPs or raw fingerprints. It computes
+`HMAC_SHA256(SECRET_SALT, ip + ":" + fingerprint)` and stores only the hex
+digest. The salt is a Worker secret. A leaked DB doesn't expose voters unless
+the salt also leaks.
+
+## Deploying your own
+
+1. `npx wrangler login`
+2. `npx wrangler d1 create isopusok` and paste the returned id into
+   `wrangler.toml`.
+3. `openssl rand -hex 32 | npx wrangler secret put SALT`
+4. `npx wrangler d1 migrations apply isopusok --remote`
+5. `npx wrangler deploy`
+
+CI auto-deploys on every push to `main` (see
+`.github/workflows/deploy.yml`). Required repo secrets:
+`CLOUDFLARE_API_TOKEN` (with `Workers Scripts:Edit` + `D1:Edit`) and
+`CLOUDFLARE_ACCOUNT_ID`.
+
+A WAF rate-limit rule on `POST /api/vote` (10 req/min per IP, block 10s) is
+recommended; the free plan allows one rule per zone.
+
+## License
+
+MIT

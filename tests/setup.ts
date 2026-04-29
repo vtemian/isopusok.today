@@ -1,11 +1,13 @@
-import { env, applyD1Migrations } from "cloudflare:test";
+import { env, applyD1Migrations, type D1Migration } from "cloudflare:test";
 import { beforeAll } from "vitest";
 
-declare module "cloudflare:test" {
-  interface ProvidedEnv {
-    DB: D1Database;
-    SALT: string;
-    TEST_MIGRATIONS: D1Migration[];
+declare global {
+  namespace Cloudflare {
+    interface Env {
+      DB: D1Database;
+      SALT: string;
+      TEST_MIGRATIONS: D1Migration[];
+    }
   }
 }
 

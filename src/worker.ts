@@ -11,6 +11,19 @@ export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
 
+    // Force HTTPS at the edge. cf-visitor is set by the Cloudflare edge and
+    // carries the original client scheme. We only act on it when present so
+    // local/test runs (no edge in front) are unaffected.
+    const visitor = req.headers.get("cf-visitor");
+    if (visitor) {
+      try {
+        if ((JSON.parse(visitor) as { scheme?: string }).scheme === "http") {
+          url.protocol = "https:";
+          return Response.redirect(url.toString(), 301);
+        }
+      } catch { /* malformed header — ignore */ }
+    }
+
     if (req.method === "POST" && url.pathname === "/api/vote") {
       return handleVote(req, env);
     }
