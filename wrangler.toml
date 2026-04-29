@@ -1,7 +1,7 @@
 name = "isopusok"
 main = "src/worker.ts"
 compatibility_date = "2024-12-30"
-compatibility_flags = ["nodejs_compat"]
+compatibility_flags = ["nodejs_compat_v2"]
 
 # Bind the D1 database. Create it once with:
 #   wrangler d1 create isopusok
@@ -12,9 +12,6 @@ database_name = "isopusok"
 database_id = "6ee54cfc-3206-4369-84a6-55fea89714eb"
 migrations_dir = "migrations"
 
-# Custom domain. Add the route after first deploy via:
-#   wrangler deploy   (then bind isopusok.today in the CF dashboard)
-# or uncomment once the zone is ready:
-# [[routes]]
-# pattern = "isopusok.today"
-# custom_domain = true
+[[routes]]
+pattern = "isopusok.today"
+custom_domain = true
