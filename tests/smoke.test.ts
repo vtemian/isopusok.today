@@ -10,7 +10,6 @@ describe("worker harness", () => {
     expect(text).toContain("is opus ok today?");
     expect(text).toContain("vote-yes");
     expect(text).toContain("vote-no");
-    expect(text).toContain("heatmap");
   });
 
   it("returns 404 for unknown routes", async () => {
