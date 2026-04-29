@@ -1,5 +1,6 @@
 import { handleVote } from "./vote";
 import { handleStats } from "./stats";
+import { PAGE_HTML } from "./page";
 
 export interface Env {
   DB: D1Database;
@@ -19,8 +20,11 @@ export default {
     }
 
     if (req.method === "GET" && url.pathname === "/") {
-      return new Response("isopusok.today — under construction", {
-        headers: { "content-type": "text/plain; charset=utf-8" },
+      return new Response(PAGE_HTML, {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control": "public, max-age=60",
+        },
       });
     }
 
