@@ -15,11 +15,13 @@ export default {
       return handleVote(req, env);
     }
 
-    if (req.method === "GET" && url.pathname === "/api/stats") {
+    const isRead = req.method === "GET" || req.method === "HEAD";
+
+    if (isRead && url.pathname === "/api/stats") {
       return handleStats(req, env);
     }
 
-    if (req.method === "GET" && url.pathname === "/") {
+    if (isRead && url.pathname === "/") {
       return new Response(PAGE_HTML, {
         headers: {
           "content-type": "text/html; charset=utf-8",
