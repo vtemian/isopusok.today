@@ -12,6 +12,7 @@ export const PAGE_HTML = `<!doctype html>
 <meta property="og:description" content="Live community telemetry on Opus mood. Cast your vote." />
 <meta property="og:type" content="website" />
 <meta name="twitter:card" content="summary" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <style>
   :root {
     --bg: #1f1f1e;

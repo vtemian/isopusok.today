@@ -7,6 +7,22 @@ export interface Env {
   SALT: string;
 }
 
+// Pixel mascot, 16x16, transparent background — same coral block + eyes + smile
+// the page draws, sized to be legible at 16/32px favicon scales.
+const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges">\
+<rect x="3" y="2" width="10" height="1" fill="#cc785c"/>\
+<rect x="2" y="3" width="12" height="9" fill="#cc785c"/>\
+<rect x="3" y="12" width="3" height="2" fill="#cc785c"/>\
+<rect x="10" y="12" width="3" height="2" fill="#cc785c"/>\
+<rect x="3" y="14" width="2" height="1" fill="#cc785c"/>\
+<rect x="11" y="14" width="2" height="1" fill="#cc785c"/>\
+<rect x="4" y="4" width="2" height="2" fill="#1f1f1e"/>\
+<rect x="10" y="4" width="2" height="2" fill="#1f1f1e"/>\
+<rect x="5" y="8" width="1" height="1" fill="#1f1f1e"/>\
+<rect x="10" y="8" width="1" height="1" fill="#1f1f1e"/>\
+<rect x="6" y="9" width="4" height="1" fill="#1f1f1e"/>\
+</svg>`;
+
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
@@ -32,6 +48,15 @@ export default {
 
     if (isRead && url.pathname === "/api/stats") {
       return handleStats(req, env);
+    }
+
+    if (isRead && url.pathname === "/favicon.svg") {
+      return new Response(FAVICON_SVG, {
+        headers: {
+          "content-type": "image/svg+xml",
+          "cache-control": "public, max-age=86400",
+        },
+      });
     }
 
     if (isRead && url.pathname === "/") {
