@@ -32,7 +32,8 @@ describe("POST /api/vote", () => {
   it("first vote inserts a row and returns the rolling tally", async () => {
     const res = await postVote({ verdict: "yes", fingerprint: "fp1" });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ yes: 1, no: 0 });
+    const body = (await res.json()) as { rolling24h: { yes: number; no: number } };
+    expect(body.rolling24h).toEqual({ yes: 1, no: 0 });
 
     const rows = await env.DB.prepare("SELECT verdict FROM votes").all();
     expect(rows.results.length).toBe(1);
@@ -42,7 +43,8 @@ describe("POST /api/vote", () => {
     await postVote({ verdict: "yes", fingerprint: "fp1" });
     const res = await postVote({ verdict: "no", fingerprint: "fp1" });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ yes: 0, no: 1 });
+    const body = (await res.json()) as { rolling24h: { yes: number; no: number } };
+    expect(body.rolling24h).toEqual({ yes: 0, no: 1 });
 
     const rows = await env.DB.prepare("SELECT verdict FROM votes").all();
     expect(rows.results.length).toBe(1);
@@ -52,7 +54,8 @@ describe("POST /api/vote", () => {
   it("same identity twice with same verdict still leaves one row", async () => {
     await postVote({ verdict: "yes", fingerprint: "fp1" });
     const res = await postVote({ verdict: "yes", fingerprint: "fp1" });
-    expect(await res.json()).toEqual({ yes: 1, no: 0 });
+    const body = (await res.json()) as { rolling24h: { yes: number; no: number } };
+    expect(body.rolling24h).toEqual({ yes: 1, no: 0 });
 
     const rows = await env.DB.prepare("SELECT id FROM votes").all();
     expect(rows.results.length).toBe(1);
@@ -66,7 +69,8 @@ describe("POST /api/vote", () => {
     vi.setSystemTime(new Date("2026-04-02T01:00:00Z"));
     const res = await postVote({ verdict: "yes", fingerprint: "fp1" });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ yes: 1, no: 0 });
+    const body = (await res.json()) as { rolling24h: { yes: number; no: number } };
+    expect(body.rolling24h).toEqual({ yes: 1, no: 0 });
 
     const rows = await env.DB.prepare("SELECT id FROM votes ORDER BY id").all();
     expect(rows.results.length).toBe(2);
@@ -75,13 +79,15 @@ describe("POST /api/vote", () => {
   it("different fingerprint same IP counts as separate identities", async () => {
     await postVote({ verdict: "yes", fingerprint: "fp1", ip: "1.2.3.4" });
     const res = await postVote({ verdict: "yes", fingerprint: "fp2", ip: "1.2.3.4" });
-    expect(await res.json()).toEqual({ yes: 2, no: 0 });
+    const body = (await res.json()) as { rolling24h: { yes: number; no: number } };
+    expect(body.rolling24h).toEqual({ yes: 2, no: 0 });
   });
 
   it("different IP same fingerprint counts as separate identities", async () => {
     await postVote({ verdict: "yes", fingerprint: "fp1", ip: "1.2.3.4" });
     const res = await postVote({ verdict: "yes", fingerprint: "fp1", ip: "5.6.7.8" });
-    expect(await res.json()).toEqual({ yes: 2, no: 0 });
+    const body = (await res.json()) as { rolling24h: { yes: number; no: number } };
+    expect(body.rolling24h).toEqual({ yes: 2, no: 0 });
   });
 
   it("rejects missing fingerprint with 400", async () => {

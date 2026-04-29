@@ -1,5 +1,6 @@
 import type { Env } from "./worker";
 import { identityHash } from "./identity";
+import { loadStats } from "./stats";
 
 const ROLLING_WINDOW_SECONDS = 24 * 60 * 60;
 
@@ -13,15 +14,15 @@ export async function handleVote(req: Request, env: Env): Promise<Response> {
   try {
     body = (await req.json()) as VoteBody;
   } catch {
-    return json({ error: "invalid json" }, 400);
+    return jsonError("invalid json", 400);
   }
 
   const verdict = body.verdict === "yes" ? 1 : body.verdict === "no" ? 0 : null;
   if (verdict === null) {
-    return json({ error: "verdict must be 'yes' or 'no'" }, 400);
+    return jsonError("verdict must be 'yes' or 'no'", 400);
   }
   if (typeof body.fingerprint !== "string" || body.fingerprint.length === 0) {
-    return json({ error: "fingerprint required" }, 400);
+    return jsonError("fingerprint required", 400);
   }
 
   const ip = req.headers.get("cf-connecting-ip") ?? "0.0.0.0";
@@ -48,18 +49,13 @@ export async function handleVote(req: Request, env: Env): Promise<Response> {
       .run();
   }
 
-  const tally = await env.DB
-    .prepare(
-      "SELECT COALESCE(SUM(verdict), 0) AS yes, COALESCE(SUM(1 - verdict), 0) AS no FROM votes WHERE ts > ?"
-    )
-    .bind(cutoff)
-    .first<{ yes: number; no: number }>();
-
-  return json({ yes: tally?.yes ?? 0, no: tally?.no ?? 0 });
+  return new Response(JSON.stringify(await loadStats(env)), {
+    headers: { "content-type": "application/json" },
+  });
 }
 
-function json(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data), {
+function jsonError(message: string, status: number): Response {
+  return new Response(JSON.stringify({ error: message }), {
     status,
     headers: { "content-type": "application/json" },
   });

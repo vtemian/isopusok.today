@@ -1,4 +1,5 @@
 import { handleVote } from "./vote";
+import { handleStats } from "./stats";
 
 export interface Env {
   DB: D1Database;
@@ -11,6 +12,10 @@ export default {
 
     if (req.method === "POST" && url.pathname === "/api/vote") {
       return handleVote(req, env);
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/stats") {
+      return handleStats(req, env);
     }
 
     if (req.method === "GET" && url.pathname === "/") {
