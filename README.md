@@ -55,12 +55,11 @@ each test file via `applyD1Migrations`. No mocks anywhere — tests hit a real
    npx wrangler login
    ```
 
-2. Create the production D1 database:
+2. Create the production D1 database (already done — see commit `8086f38`):
    ```sh
    npx wrangler d1 create isopusok
    ```
-   Copy the `database_id` from the output into `wrangler.toml` (replacing
-   `REPLACE_ME`).
+   Paste the returned `database_id` into `wrangler.toml`.
 
 3. Set the production salt:
    ```sh
