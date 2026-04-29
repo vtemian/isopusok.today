@@ -9,7 +9,7 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "isopusok"
-database_id = "REPLACE_ME"
+database_id = "6ee54cfc-3206-4369-84a6-55fea89714eb"
 migrations_dir = "migrations"
 
 # Custom domain. Add the route after first deploy via:

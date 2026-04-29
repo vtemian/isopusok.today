@@ -111,21 +111,25 @@ export const PAGE_HTML = `<!doctype html>
     text-transform: lowercase;
   }
   .history h2::before { content: "// "; }
-  .heatmap {
+  .heatmap-2d {
     display: grid;
     grid-template-columns: repeat(30, 1fr);
-    gap: 3px;
+    grid-auto-rows: 1fr;
+    gap: 2px;
     margin-bottom: 8px;
+    /* 24 rows of equal-height cells, container wide enough that each cell ~16-18px square */
+    aspect-ratio: 30 / 24;
   }
-  .day {
-    aspect-ratio: 1 / 1;
-    background: var(--grid-empty);
+  .cell {
+    width: 100%;
+    height: 100%;
+    background: var(--coral); /* default = "ok" (no votes counts as ok) */
   }
-  .day[data-pct="0"]   { background: #3a2a26; }
-  .day[data-pct="25"]  { background: #5a3a30; }
-  .day[data-pct="50"]  { background: #885548; }
-  .day[data-pct="75"]  { background: #aa6952; }
-  .day[data-pct="100"] { background: var(--coral); }
+  .cell[data-pct="0"]   { background: #3a2a26; }
+  .cell[data-pct="25"]  { background: #5a3a30; }
+  .cell[data-pct="50"]  { background: #885548; }
+  .cell[data-pct="75"]  { background: #aa6952; }
+  .cell[data-pct="100"] { background: var(--coral); }
   .legend {
     color: var(--muted);
     font-size: 0.75rem;
@@ -165,18 +169,18 @@ export const PAGE_HTML = `<!doctype html>
   <p class="meta" id="meta"></p>
 
   <section class="history">
-    <h2>last 30 days</h2>
-    <div class="heatmap" id="heatmap" role="img" aria-label="daily yes percentage, last 30 days"></div>
+    <h2>last 30 days · 24 hours utc · empty = ok</h2>
+    <div class="heatmap-2d" id="heatmap" role="img" aria-label="hourly yes percentage, last 30 days"></div>
     <div class="legend">
       <span>30 days ago</span>
       <span class="swatches" aria-hidden="true">
-        <span class="swatch" style="background:#3a2a26"></span>
-        <span class="swatch" style="background:#5a3a30"></span>
-        <span class="swatch" style="background:#885548"></span>
-        <span class="swatch" style="background:#aa6952"></span>
-        <span class="swatch" style="background:#cc785c"></span>
+        <span class="swatch" title="0% yes" style="background:#3a2a26"></span>
+        <span class="swatch" title="25% yes" style="background:#5a3a30"></span>
+        <span class="swatch" title="50% yes" style="background:#885548"></span>
+        <span class="swatch" title="75% yes" style="background:#aa6952"></span>
+        <span class="swatch" title="100% yes / no complaints" style="background:#cc785c"></span>
       </span>
-      <span>today</span>
+      <span>now (utc)</span>
     </div>
   </section>
 
@@ -271,6 +275,7 @@ function drawMascot(verdict) {
 }
 
 // ---------- bar ----------
+// No votes in the last 24h is treated as "opus is ok" (silence = no complaints).
 function renderBar(yes, no) {
   const total = yes + no;
   const bar = document.getElementById("bar");
@@ -278,9 +283,9 @@ function renderBar(yes, no) {
   bar.replaceChildren();
 
   if (total === 0) {
-    const empty = el("span", { class: "empty" }, "░".repeat(20));
-    bar.append(empty, document.createTextNode(" —"));
-    meta.replaceChildren(document.createTextNode("no votes in the last 24h. cast yours."));
+    const filled = el("span", { class: "filled" }, "█".repeat(20));
+    bar.append(filled, document.createTextNode(" ok"));
+    meta.replaceChildren(document.createTextNode("0 complaints in the last 24h. opus is ok."));
     return;
   }
 
@@ -295,27 +300,50 @@ function renderBar(yes, no) {
   meta.append(yesSpan, document.createTextNode(" · " + no + " no · last 24h"));
 }
 
-// ---------- heatmap ----------
-function renderHeatmap(days) {
+// ---------- 2D heatmap ----------
+// Columns = last 30 UTC days (oldest left, today right).
+// Rows    = 24 UTC hours (00 top, 23 bottom).
+// Empty cells (no votes) are rendered as "ok" (full coral) per project rule.
+function bucketPct(pct) {
+  return pct >= 90 ? 100 : pct >= 65 ? 75 : pct >= 35 ? 50 : pct >= 10 ? 25 : 0;
+}
+
+function pad2(n) { return String(n).padStart(2, "0"); }
+
+function renderHeatmap(cells) {
   const grid = document.getElementById("heatmap");
   grid.replaceChildren();
-  const byDate = new Map(days.map((d) => [d.date, d]));
-  const today = new Date();
+
+  const byKey = new Map(cells.map((c) => [c.date + "T" + pad2(c.hour), c]));
+  const now = new Date();
+  const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+
+  // Build 30 dates oldest -> newest, left to right.
+  const dates = [];
   for (let i = 29; i >= 0; i--) {
-    const d = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - i));
-    const key = d.toISOString().slice(0, 10);
-    const cell = el("div", { class: "day" });
-    const entry = byDate.get(key);
-    if (entry) {
-      const total = entry.yes + entry.no;
-      const pct = total === 0 ? 0 : Math.round((entry.yes / total) * 100);
-      const bucket = pct >= 90 ? 100 : pct >= 65 ? 75 : pct >= 35 ? 50 : pct >= 10 ? 25 : 0;
-      cell.dataset.pct = String(bucket);
-      cell.title = key + ": " + pct + "% yes (" + total + " votes)";
-    } else {
-      cell.title = key + ": no data";
+    const d = new Date(todayUTC);
+    d.setUTCDate(d.getUTCDate() - i);
+    dates.push(d.toISOString().slice(0, 10));
+  }
+
+  // Row-major: hour 0 first (top), hour 23 last (bottom).
+  // Within each row: oldest day first (left), today last (right).
+  for (let h = 0; h < 24; h++) {
+    for (const date of dates) {
+      const cell = el("div", { class: "cell" });
+      const entry = byKey.get(date + "T" + pad2(h));
+      const label = date + " " + pad2(h) + ":00 utc";
+      if (entry) {
+        const total = entry.yes + entry.no;
+        const pct = total === 0 ? 0 : Math.round((entry.yes / total) * 100);
+        cell.dataset.pct = String(bucketPct(pct));
+        cell.title = label + " — " + pct + "% yes (" + total + " votes)";
+      } else {
+        // No data = opus presumed ok. Default cell color is full coral.
+        cell.title = label + " — no complaints (opus presumed ok)";
+      }
+      grid.appendChild(cell);
     }
-    grid.appendChild(cell);
   }
 }
 
@@ -388,12 +416,13 @@ function highlightVote(verdict) {
 function moodFor(stats, currentVote) {
   if (currentVote === "yes" || currentVote === "no") return currentVote;
   const { yes, no } = stats.rolling24h;
-  if (yes + no === 0) return null;
+  // No votes => opus presumed ok => smile.
+  if (yes + no === 0) return "yes";
   return yes >= no ? "yes" : "no";
 }
 function applyStats(stats, currentVote) {
   renderBar(stats.rolling24h.yes, stats.rolling24h.no);
-  renderHeatmap(stats.days || []);
+  renderHeatmap(stats.cells || []);
   drawMascot(moodFor(stats, currentVote));
 }
 
@@ -434,7 +463,8 @@ async function vote(verdict) {
 (async () => {
   const stored = getStoredVote();
   if (stored === "yes" || stored === "no") highlightVote(stored);
-  drawMascot(stored);
+  // Default mascot mood is "yes" — opus is ok until proven otherwise.
+  drawMascot(stored ?? "yes");
   document.getElementById("vote-yes").addEventListener("click", () => vote("yes"));
   document.getElementById("vote-no").addEventListener("click", () => vote("no"));
   try {
